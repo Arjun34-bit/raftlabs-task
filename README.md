@@ -29,6 +29,11 @@ configuration connects to `localhost:5433` using the database and credentials
 declared by `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` in
 the repository-level `.env` file.
 
+Production defaults PostgreSQL connections to TLS. Set `NODE_ENV=production`
+and provide `DATABASE_URL`; use `DB_SSL=require` to make the requirement
+explicit. `DB_SSL=disable` is available only for deployments whose database
+endpoint intentionally does not support TLS.
+
 Migrations are applied in filename order from `apps/api/src/db/migrations`.
 Applied filenames are recorded in `schema_migrations`, so rerunning the command
 is safe and only pending table changes are executed.
