@@ -1,0 +1,23 @@
+import { Router } from "express";
+import { menuRepository } from "./modules/menu/menu.repository.js";
+import { createOrderSchema, statusSchema, trackingIdsSchema, updateOrderSchema } from "./modules/orders/order.schema.js";
+import { orderService } from "./modules/orders/order.service.js";
+import { orderEvents } from "./modules/orders/order.events.js";
+import { orderRepository } from "./modules/orders/order.repository.js";
+import { requireAdmin } from "./middleware/admin.js";
+
+export const routes = Router();
+const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
+routes.get("/health", (_req, res) => res.json({ success: true, data: { status: "ok", timestamp: new Date().toISOString() } }));
+routes.get("/menu", async (_req, res, next) => { try { res.json({ success: true, data: await menuRepository.list() }); } catch (e) { next(e); } });
+routes.get("/menu/:id", async (req, res, next) => { try { const item = await menuRepository.findById(param(req.params.id)); if (!item) return res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Menu item not found" } }); res.json({ success: true, data: item }); } catch (e) { next(e); } });
+routes.post("/orders", async (req, res, next) => { try { const key=req.header("idempotency-key"); if(key && key.length>100) return res.status(400).json({success:false,error:{code:"VALIDATION_ERROR",message:"Idempotency key is too long"}}); const order = await orderService.create(createOrderSchema.parse(req.body), key); res.status(201).json({ success: true, data: { orderId: order!.id, trackingId: order!.trackingId, status: order!.status, totalMinor: order!.totalMinor, currency: "INR" } }); } catch (e) { next(e); } });
+routes.get("/track/:trackingId", async (req, res, next) => { try { res.json({ success: true, data: await orderService.getPublic(param(req.params.trackingId)) }); } catch (e) { next(e); } });
+routes.post("/track/orders", async (req, res, next) => { try { const { trackingIds } = trackingIdsSchema.parse(req.body); res.json({ success: true, data: await orderService.listPublic(trackingIds) }); } catch (e) { next(e); } });
+routes.get("/track/:trackingId/events", async (req, res, next) => { try { const trackingId=param(req.params.trackingId); await orderService.getPublic(trackingId); res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders(); const send = (order: unknown) => res.write(`event: status\ndata: ${JSON.stringify(order)}\n\n`); const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 20_000); orderEvents.on(trackingId, send); req.on("close", () => { clearInterval(heartbeat); orderEvents.off(trackingId, send); }); } catch (e) { next(e); } });
+routes.get("/orders", requireAdmin, async (_req, res, next) => { try { res.json({ success: true, data: await orderService.list() }); } catch (e) { next(e); } });
+routes.get("/orders/:id", requireAdmin, async (req, res, next) => { try { res.json({ success: true, data: await orderService.get(param(req.params.id)) }); } catch (e) { next(e); } });
+routes.patch("/orders/:id", requireAdmin, async (req, res, next) => { try { res.json({ success: true, data: await orderService.update(param(req.params.id), updateOrderSchema.parse(req.body)) }); } catch (e) { next(e); } });
+routes.delete("/orders/:id", requireAdmin, async (req, res, next) => { try { res.json({ success: true, data: await orderService.cancel(param(req.params.id)) }); } catch (e) { next(e); } });
+routes.patch("/orders/:id/status", requireAdmin, async (req, res, next) => { try { const { status } = statusSchema.parse(req.body); res.json({ success: true, data: await orderService.transition(param(req.params.id), status) }); } catch (e) { next(e); } });
+routes.get("/orders/:id/history", requireAdmin, async (req, res, next) => { try { const id=param(req.params.id); await orderService.get(id); res.json({ success: true, data: await orderRepository.history(id) }); } catch (e) { next(e); } });

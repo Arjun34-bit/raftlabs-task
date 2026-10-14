@@ -1,0 +1,14 @@
+{
+  "name": "raftlabs-order-management",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,green \"npm run dev -w @raftlabs/web\" \"npm run dev -w @raftlabs/api\"",
+    "build": "npm run build -w @raftlabs/shared && npm run build -w @raftlabs/api && npm run build -w @raftlabs/web",
+    "test": "npm run test -w @raftlabs/api && npm run test -w @raftlabs/web",
+    "typecheck": "npm run build -w @raftlabs/shared && npm run typecheck -ws --if-present",
+    "lint": "npm run lint -ws --if-present"
+  },
+  "devDependencies": { "concurrently": "^9.1.2" },
+  "engines": { "node": ">=20" }
+}
