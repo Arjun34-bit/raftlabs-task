@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import { db } from "../../db/client.js";
 import { menuItems, orderItems, orders, statusHistory } from "../../db/schema.js";
 import { calculatePricing, type CreateOrderInput, type OrderStatus } from "@raftlabs/shared";
+import { nextTransitionAt } from "./order-schedule.js";
 
 const hydrate = async (order: typeof orders.$inferSelect | undefined, includePrivate = true) => {
   if (!order) return undefined;
@@ -24,7 +25,8 @@ export const orderRepository = {
       if (selected.length !== requested.length) throw Object.assign(new Error("One or more menu items are unavailable"), { status: 422, code: "ITEM_UNAVAILABLE" });
       const lines = input.items.map(item => { const product = selected.find(p => p.id === item.menuItemId)!; return { product, quantity: item.quantity, lineTotalMinor: product.priceMinor * item.quantity }; });
       const pricing = calculatePricing(lines.reduce((sum, line) => sum + line.lineTotalMinor, 0), input.promoCode);
-      const [order] = await tx.insert(orders).values({ idempotencyKey, customerName: input.customer.name, customerPhone: input.customer.phone, deliveryAddress: input.customer.address, ...pricing, nextTransitionAt: new Date(Date.now() + 10_000) }).returning();
+      const createdAt = new Date();
+      const [order] = await tx.insert(orders).values({ idempotencyKey, customerName: input.customer.name, customerPhone: input.customer.phone, deliveryAddress: input.customer.address, ...pricing, createdAt, updatedAt: createdAt, nextTransitionAt: nextTransitionAt("RECEIVED", createdAt) }).returning();
       await tx.insert(orderItems).values(lines.map(({ product, quantity, lineTotalMinor }) => ({ orderId: order.id, menuItemId: product.id, itemName: product.name, quantity, unitPriceMinor: product.priceMinor, lineTotalMinor })));
       await tx.insert(statusHistory).values({ orderId: order.id, fromStatus: null, toStatus: "RECEIVED" });
       return hydrate(order);

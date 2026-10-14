@@ -16,6 +16,10 @@ export const env = z.object({
   DB_NAME: z.string().default("raftlabs_orders"),
   FRONTEND_URL: z.string().default("http://localhost:3000"),
   DEMO_MODE: z.string().default("true").transform(v => v === "true"),
+  ORDER_PREPARING_DELAY_MS: z.coerce.number().int().positive().default(10_000),
+  ORDER_DELIVERY_START_DELAY_MS: z.coerce.number().int().positive().default(25_000),
+  ORDER_DELIVERED_DELAY_MS: z.coerce.number().int().positive().default(45_000),
+  ORDER_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   ADMIN_API_KEY: z.string().default("change-me")
 }).transform((values) => ({
   ...values,
