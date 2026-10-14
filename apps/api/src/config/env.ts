@@ -17,7 +17,8 @@ export const env = z.object({
   // Hosted PostgreSQL providers generally require TLS. Keep local development
   // convenient, while allowing either environment to override the default.
   DB_SSL: z.enum(["disable", "require"]).optional(),
-  FRONTEND_URL: z.string().default("http://localhost:3000"),
+  FRONTEND_URL: z.string().url().default("http://localhost:3000")
+    .transform((value) => value.replace(/\/+$/, "")),
   DEMO_MODE: z.string().default("true").transform(v => v === "true"),
   ORDER_PREPARING_DELAY_MS: z.coerce.number().int().positive().default(10_000),
   ORDER_DELIVERY_START_DELAY_MS: z.coerce.number().int().positive().default(25_000),
